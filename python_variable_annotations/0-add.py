@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Define function add
+""" Define function add"""
 
 
 def add(a: float, b: float) -> float:
