@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """define function to_kv"""
 
-
-from ast import Tuple
-from ctypes import Union
+from typing import Union, Tuple
 
 
 def to_kv(k: str, v: Union[int, float]) -> Tuple[str, float]:
