@@ -6,4 +6,3 @@ import math
 def floor(n: float) -> int:
     """change float to integer"""
     return math.floor(n)
-    
