@@ -4,14 +4,9 @@ A Basic flask application
 """
 import pytz
 import datetime
-from typing import (
-    Dict, Union
-)
-
-from flask import Flask, g, request
-from flask import render_template
-from flask_babel import Babel
-from flask_babel import format_datetime
+from typing import Dict, Union
+from flask import Flask, g, request, render_template
+from flask_babel import Babel, format_datetime
 
 
 class Config(object):
@@ -30,8 +25,8 @@ app.config.from_object(Config)
 # Wrap the application with Babel
 babel = Babel(app)
 
-# The users table (dictionary of users)
-users = {
+# Define the users table globally
+users: Dict[int, Dict[str, Union[str, None]]] = {
     1: {"name": "Balou", "locale": "fr", "timezone": "Europe/Paris"},
     2: {"name": "Beyonce", "locale": "en", "timezone": "US/Central"},
     3: {"name": "Spock", "locale": "kg", "timezone": "Vulcan"},
@@ -39,16 +34,12 @@ users = {
 }
 
 
-def get_user(id) -> Union[Dict[str, Union[str, None]], None]:
+def get_user(user_id: Union[str, int]) -> Union[Dict[str, Union[str, None]], None]:
     """
-    Validate user login details
-    Args:
-        id (str): user id
-    Returns:
-        (Dict): user dictionary if id is valid else None
+    Retrieve user by ID from the users table
     """
     try:
-        return users.get(int(id))
+        return users.get(int(user_id))
     except (ValueError, TypeError):
         return None
 
@@ -56,16 +47,19 @@ def get_user(id) -> Union[Dict[str, Union[str, None]], None]:
 @babel.localeselector
 def get_locale() -> str:
     """
-    Gets locale from request object or user preferences
+    Gets the best locale from the request, user preference, or defaults
     """
-    options = [
-        request.args.get('locale', '').strip(),
-        g.user.get('locale', None) if g.user else None,
-        request.accept_languages.best_match(app.config['LANGUAGES']),
-        Config.BABEL_DEFAULT_LOCALE
+    # List of options to select locale from: request, user, or default
+    locale_options = [
+        request.args.get('locale', '').strip(),  # Locale from query parameters
+        g.user.get('locale') if g.user else None,  # Locale from user data
+        request.accept_languages.best_match(app.config['LANGUAGES']),  # From browser
+        Config.BABEL_DEFAULT_LOCALE  # Default locale
     ]
-    for locale in options:
-        if locale and locale in Config.LANGUAGES:
+    
+    # Return the first valid locale in the options list
+    for locale in locale_options:
+        if locale in Config.LANGUAGES:
             return locale
     return Config.BABEL_DEFAULT_LOCALE
 
@@ -73,35 +67,37 @@ def get_locale() -> str:
 @babel.timezoneselector
 def get_timezone() -> str:
     """
-    Gets timezone from request object
+    Retrieves the timezone from the request or user data
     """
-    tz = request.args.get('timezone', '').strip()
-    if not tz and g.user:
-        tz = g.user['timezone']
+    timezone = request.args.get('timezone', '').strip()
+    
+    # Use user's timezone if available
+    if not timezone and g.user:
+        timezone = g.user.get('timezone')
+    
+    # Ensure timezone is valid, else fallback to default
     try:
-        tz = pytz.timezone(tz).zone
+        pytz.timezone(timezone)
     except pytz.exceptions.UnknownTimeZoneError:
-        tz = app.config['BABEL_DEFAULT_TIMEZONE']
-    return tz
+        timezone = Config.BABEL_DEFAULT_TIMEZONE
+    
+    return timezone
 
 
 @app.before_request
 def before_request() -> None:
     """
-    Adds valid user to the global session object `g`
+    Function to run before each request. It sets the user and current time.
     """
     user_id = request.args.get('login_as')
-    if user_id:
-        g.user = get_user(user_id)
-    else:
-        g.user = None
-    g.time = format_datetime(datetime.datetime.now())
+    g.user = get_user(user_id)  # Set the user in the global context
+    g.time = format_datetime(datetime.datetime.now())  # Set current time
 
 
 @app.route('/', strict_slashes=False)
 def index() -> str:
     """
-    Renders a basic html template
+    Renders the homepage using a basic template
     """
     return render_template('index.html')
 
